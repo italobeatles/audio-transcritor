@@ -113,11 +113,13 @@ temp/               Arquivos temporarios, ignorados no Git
 npm start
 npm run diagnostico
 npm run limpar
+npm run transcrever
 ```
 
 ## Seguranca
 
 - `.env` esta no `.gitignore`.
+- `.env.example` deve conter apenas placeholders e valores publicos.
 - Arquivos reais de audio em `audio/` sao ignorados.
 - Saidas de transcricao e relatorios em `output/` sao ignoradas.
 - Tokens e API keys devem ser rotacionados se forem expostos por engano.

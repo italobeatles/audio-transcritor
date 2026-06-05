@@ -1,5 +1,61 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage and build artifacts
+coverage
+*.lcov
+.nyc_output
+build/Release
+dist
+out
+.output
+
+# Dependency directories
 node_modules/
+jspm_packages/
+web_modules/
+
+# Tool caches
+.cache
+.parcel-cache
+.next
+.nuxt
+.temp
+.svelte-kit/
+.vite/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.npm
+.pnpm-store
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# dotenv environment variable files
 .env
+.env.*
+!.env.example
+
+# Local app files
 audio/*
 !audio/.gitkeep
 temp/
