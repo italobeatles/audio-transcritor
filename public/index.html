@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transcritor de Áudios</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">TA</div>
+        <div>
+          <div class="brand-title">Transcritor</div>
+          <div class="brand-subtitle">Áudios WhatsApp</div>
+        </div>
+      </div>
+
+      <div class="sidebar-card">
+        <div class="sidebar-label">Fluxo</div>
+        <div class="sidebar-step active">1. Enviar áudio</div>
+        <div class="sidebar-step">2. Ler transcrição</div>
+        <div class="sidebar-step">3. Criar resposta</div>
+      </div>
+
+      <section class="providers-panel sidebar-card">
+        <div class="providers-header">
+          <div>
+            <div class="sidebar-label">Providers</div>
+            <small class="field-help">Status dos modelos usados para criar a resposta.</small>
+          </div>
+          <button type="button" class="icon-button" id="refreshProvidersBtn" title="Verificar providers">↻</button>
+        </div>
+        <div class="providers-meta" id="providersMeta">Verificação pendente</div>
+        <div id="providersGrid" class="providers-grid"></div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Upload, transcrição e resposta</h1>
+          <p>Faça upload de um áudio, revise o texto e gere uma resposta pronta usando o contexto informado.</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="status-pill" id="statusPill">Pronto</div>
+        </div>
+      </header>
+
+      <section class="grid">
+        <article class="panel panel-upload">
+          <div class="panel-header">
+            <div>
+              <h2>Áudio</h2>
+              <small class="field-help">Envie o arquivo que será transcrito antes da criação da resposta.</small>
+            </div>
+            <span class="panel-chip">opus / mp3 / wav</span>
+          </div>
+          <div id="dropZone" class="drop-zone">
+            <input id="audioInput" type="file" accept="audio/*" hidden>
+            <div class="drop-icon">↑</div>
+            <div class="drop-title">Solte o arquivo aqui</div>
+            <div class="drop-text">ou clique para selecionar do computador</div>
+            <button type="button" class="button secondary" id="chooseFileBtn">Selecionar áudio</button>
+          </div>
+          <div class="file-row">
+            <div>
+              <div class="field-label">Arquivo selecionado</div>
+              <small class="field-help">Nome do áudio que será enviado para transcrição.</small>
+              <div id="fileName" class="file-name">Nenhum arquivo selecionado</div>
+            </div>
+            <button type="button" class="button primary" id="transcribeBtn">Transcrever</button>
+          </div>
+        </article>
+
+        <article class="panel panel-main">
+          <div class="panel-header">
+            <div>
+              <h2>Transcrição</h2>
+              <small class="field-help">Revise ou ajuste o texto transcrito para corrigir ruídos antes de gerar a resposta.</small>
+            </div>
+            <span class="panel-chip">texto editável</span>
+          </div>
+          <textarea id="transcript" placeholder="A transcrição aparecerá aqui. Você também pode editar o texto antes de gerar a resposta."></textarea>
+        </article>
+      </section>
+
+      <section class="panel response-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Informações relevantes para a resposta</h2>
+            <small class="field-help">Inclua detalhes pessoais, intenção, limites, tom desejado e qualquer contexto que a IA deve considerar ao escrever a mensagem.</small>
+          </div>
+          <span class="panel-chip">contexto obrigatório</span>
+        </div>
+        <textarea id="context" class="context" placeholder="Ex.: quero parecer interessado, mas sem promessa afetiva; explique que sou autista nível de suporte 1; mantenha tom de melhor amigo e psicólogo."></textarea>
+
+        <div class="panel-header response-output-header">
+          <div>
+            <h2>Resposta pronta</h2>
+            <small class="field-help">Texto final para copiar e enviar, não um resumo nem instruções.</small>
+          </div>
+          <span class="panel-chip">WhatsApp</span>
+        </div>
+        <div class="actions">
+          <button type="button" class="button primary" id="generateBtn">Criar resposta</button>
+          <button type="button" class="button ghost" id="copyBtn">Copiar resposta</button>
+        </div>
+        <textarea id="answer" class="answer" placeholder="A resposta gerada aparecerá aqui." readonly></textarea>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

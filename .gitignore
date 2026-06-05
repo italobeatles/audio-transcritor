@@ -1,0 +1,9 @@
+node_modules/
+.env
+audio/*
+!audio/.gitkeep
+temp/
+output/*.json
+output/*.txt
+output/*.md
+!output/.gitkeep
