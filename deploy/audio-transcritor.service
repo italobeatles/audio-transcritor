@@ -1,0 +1,18 @@
+[Unit]
+Description=Audio Transcritor Node Application
+After=network.target
+
+[Service]
+Type=simple
+User=italo
+Group=italo
+WorkingDirectory=/var/www/audio-transcritor
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /var/www/audio-transcritor/server.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/audio-transcritor.log
+StandardError=append:/var/log/audio-transcritor-error.log
+
+[Install]
+WantedBy=multi-user.target

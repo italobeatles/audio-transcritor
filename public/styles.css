@@ -83,6 +83,27 @@ textarea:focus { border-color: rgba(0, 200, 255, 0.7); box-shadow: 0 0 0 3px rgb
 
 .notice { margin-top: 14px; color: var(--muted); font-size: 13px; min-height: 20px; }
 
+.developer-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 16px 4px 6px;
+  color: var(--muted);
+  font-size: 13px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.developer-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.developer-footer a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 1100px) {
   .app-shell, .grid { grid-template-columns: 1fr; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
@@ -93,5 +114,6 @@ textarea:focus { border-color: rgba(0, 200, 255, 0.7); box-shadow: 0 0 0 3px rgb
   .topbar { flex-direction: column; }
   .topbar-actions { width: 100%; justify-content: space-between; }
   .file-row, .actions { flex-direction: column; align-items: stretch; }
+  .developer-footer { flex-direction: column; align-items: flex-start; }
   textarea { min-height: 240px; }
 }

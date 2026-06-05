@@ -21,6 +21,7 @@ const uploadDir = path.join(tempDir, 'uploads');
 
 const app = express();
 const upload = multer({ dest: uploadDir });
+app.set('trust proxy', true);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(publicDir));
 
@@ -411,10 +412,21 @@ app.get('/api/providers', async (req, res) => {
   }
 });
 
+app.get('/health', async (req, res) => {
+  try {
+    await ensureDir(tempDir);
+    await ensureDir(uploadDir);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message || 'Falha no healthcheck.' });
+  }
+});
+
 const port = Number(process.env.PORT || 3000);
-app.listen(port, async () => {
+const host = process.env.HOST || '127.0.0.1';
+app.listen(port, host, async () => {
   await ensureDir(tempDir);
   await ensureDir(uploadDir);
   await refreshProviders().catch(() => {});
-  console.log(`Servidor iniciado em http://localhost:${port}`);
+  console.log(`Servidor iniciado em http://${host}:${port}`);
 });

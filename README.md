@@ -50,6 +50,14 @@ npm start
 http://localhost:3000
 ```
 
+## Publicacao com Apache
+
+Neste servidor, a publicacao recomendada e `Apache + proxy reverso + systemd`.
+
+- Defina `HOST=127.0.0.1` para manter o Node acessivel apenas localmente.
+- Use `GET /health` para validar servico e proxy reverso.
+- Publique o dominio HTTPS no Apache apontando para `http://127.0.0.1:PORT`.
+
 ## Variaveis de ambiente
 
 O arquivo `.env` e ignorado pelo Git. Nunca commite chaves reais. Use `.env.example` como referencia.
@@ -57,6 +65,7 @@ O arquivo `.env` e ignorado pelo Git. Nunca commite chaves reais. Use `.env.exam
 Variaveis principais:
 
 - `PORT`: porta HTTP local, padrao `3000`.
+- `HOST`: interface de bind do Express, padrao `127.0.0.1` para uso com proxy reverso local.
 - `LOCAL_TRANSCRIPTION_MODEL`: modelo local de transcricao, padrao `Xenova/whisper-tiny`.
 - `OPENAI_API_KEY`: chave da OpenAI.
 - `USE_OPENAI`: `true` ou `false` para habilitar chamadas OpenAI.
