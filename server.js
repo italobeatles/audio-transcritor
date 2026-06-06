@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import ffmpegPath from 'ffmpeg-static';
 import ffmpeg from 'fluent-ffmpeg';
 import wav from 'wav-decoder';
-import { pipeline } from '@xenova/transformers';
+import { pipeline, env as transformersEnv } from '@xenova/transformers';
 import OpenAI from 'openai';
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -17,6 +17,10 @@ const __dirname = path.dirname(__filename);
 const root = __dirname;
 const publicDir = path.join(root, 'public');
 const tempDir = path.join(root, 'temp');
+const transformersCacheDir = path.join(root, '.cache', 'transformers');
+
+transformersEnv.cacheDir = transformersCacheDir;
+transformersEnv.useFSCache = true;
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -41,8 +45,13 @@ async function ensureDir(dir) {
   await fs.ensureDir(dir);
 }
 
+async function ensureRuntimeDirs() {
+  await ensureDir(tempDir);
+  await ensureDir(transformersCacheDir);
+}
+
 async function convertToWav(inputFile) {
-  const outputFile = path.join(tempDir, `${path.basename(inputFile, path.extname(inputFile))}.wav`);
+  const outputFile = path.join(tempDir, `${path.basename(inputFile, path.extname(inputFile))}-${Date.now()}.wav`);
   await ensureDir(tempDir);
   await new Promise((resolve, reject) => {
     ffmpeg(inputFile)
@@ -736,7 +745,7 @@ app.get('/api/providers', async (req, res) => {
 
 app.get('/health', async (req, res) => {
   try {
-    await ensureDir(tempDir);
+    await ensureRuntimeDirs();
     res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message || 'Falha no healthcheck.' });
@@ -746,7 +755,7 @@ app.get('/health', async (req, res) => {
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '127.0.0.1';
 app.listen(port, host, async () => {
-  await ensureDir(tempDir);
+  await ensureRuntimeDirs();
   await refreshProviders().catch(() => {});
   console.log(`Servidor iniciado em http://${host}:${port}`);
 });
