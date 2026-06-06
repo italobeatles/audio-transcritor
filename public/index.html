@@ -72,6 +72,12 @@
             </div>
             <button type="button" class="button primary" id="transcribeBtn">Transcrever</button>
           </div>
+          <div id="transcribeProgress" class="progress-bar-container" style="display:none">
+            <div class="progress-bar-track">
+              <div id="transcribeProgressBar" class="progress-bar-fill" style="width:0%"></div>
+            </div>
+            <div id="transcribeProgressText" class="progress-bar-label">0%</div>
+          </div>
         </article>
 
         <article class="panel panel-main">
@@ -106,6 +112,12 @@
         <div class="actions">
           <button type="button" class="button primary" id="generateBtn">Criar resposta</button>
           <button type="button" class="button ghost" id="copyBtn">Copiar resposta</button>
+        </div>
+        <div id="respondProgress" class="progress-bar-container" style="display:none">
+          <div class="progress-bar-track">
+            <div id="respondProgressBar" class="progress-bar-fill" style="width:0%"></div>
+          </div>
+          <div id="respondProgressText" class="progress-bar-label">0%</div>
         </div>
         <textarea id="answer" class="answer" placeholder="A resposta gerada aparecerá aqui." readonly></textarea>
       </section>

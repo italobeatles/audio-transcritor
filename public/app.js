@@ -12,6 +12,12 @@ const statusPill = document.getElementById('statusPill');
 const refreshProvidersBtn = document.getElementById('refreshProvidersBtn');
 const providersGrid = document.getElementById('providersGrid');
 const providersMeta = document.getElementById('providersMeta');
+const transcribeProgress = document.getElementById('transcribeProgress');
+const transcribeProgressBar = document.getElementById('transcribeProgressBar');
+const transcribeProgressText = document.getElementById('transcribeProgressText');
+const respondProgress = document.getElementById('respondProgress');
+const respondProgressBar = document.getElementById('respondProgressBar');
+const respondProgressText = document.getElementById('respondProgressText');
 
 let selectedFile = null;
 
@@ -110,6 +116,51 @@ dropZone.addEventListener('drop', e => {
   }
 });
 
+async function readSSE(response, onEvent, onError) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    let eventType = '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('event: ')) {
+        eventType = trimmed.slice(7).trim();
+      } else if (trimmed.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+          if (eventType === 'error') {
+            onError?.(data.error || 'Erro desconhecido');
+          } else {
+            onEvent?.(eventType, data);
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+}
+
+function showProgress(container, bar, text, percent, step) {
+  if (!container) return;
+  container.style.display = 'block';
+  bar.style.width = `${Math.min(percent, 100)}%`;
+  text.textContent = step ? `${step} (${percent}%)` : `${percent}%`;
+}
+
+function hideProgress(container) {
+  if (container) container.style.display = 'none';
+}
+
 transcribeBtn.addEventListener('click', async () => {
   if (!selectedFile) {
     setStatus('Selecione um áudio');
@@ -117,18 +168,36 @@ transcribeBtn.addEventListener('click', async () => {
   }
 
   setBusy(transcribeBtn, true, 'Transcrevendo...');
+  showProgress(transcribeProgress, transcribeProgressBar, transcribeProgressText, 0, 'Iniciando...');
   setStatus('Transcrevendo');
   try {
     const formData = new FormData();
     formData.append('audio', selectedFile);
+
     const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Falha na transcrição');
-    transcript.value = data.text || '';
-    setStatus('Transcrição pronta');
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Erro ${response.status}`);
+    }
+
+    await readSSE(response, (event, data) => {
+      if (event === 'progress') {
+        showProgress(transcribeProgress, transcribeProgressBar, transcribeProgressText, data.percent, data.step);
+        setStatus(data.step || 'Transcrevendo');
+      } else if (event === 'result') {
+        transcript.value = data.text || '';
+        hideProgress(transcribeProgress);
+        setStatus('Transcrição pronta');
+      }
+    }, (error) => {
+      setStatus('Erro na transcrição');
+      transcript.value = `Erro: ${error}`;
+      hideProgress(transcribeProgress);
+    });
   } catch (error) {
     setStatus('Erro na transcrição');
     transcript.value = `Erro: ${error.message}`;
+    hideProgress(transcribeProgress);
   } finally {
     setBusy(transcribeBtn, false);
   }
@@ -141,6 +210,7 @@ generateBtn.addEventListener('click', async () => {
   }
 
   setBusy(generateBtn, true, 'Gerando...');
+  showProgress(respondProgress, respondProgressBar, respondProgressText, 0, 'Iniciando...');
   setStatus('Gerando resposta');
   try {
     const response = await fetch('/api/respond', {
@@ -151,13 +221,30 @@ generateBtn.addEventListener('click', async () => {
         userContext: context.value
       })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Falha ao gerar resposta');
-    answer.value = data.text || '';
-    setStatus('Resposta pronta');
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Erro ${response.status}`);
+    }
+
+    await readSSE(response, (event, data) => {
+      if (event === 'progress') {
+        showProgress(respondProgress, respondProgressBar, respondProgressText, data.percent, data.step);
+        setStatus(data.step || 'Gerando resposta');
+      } else if (event === 'result') {
+        answer.value = data.text || '';
+        hideProgress(respondProgress);
+        setStatus('Resposta pronta');
+      }
+    }, (error) => {
+      setStatus('Erro na resposta');
+      answer.value = `Erro: ${error}`;
+      hideProgress(respondProgress);
+    });
   } catch (error) {
     setStatus('Erro na resposta');
     answer.value = `Erro: ${error.message}`;
+    hideProgress(respondProgress);
   } finally {
     setBusy(generateBtn, false);
   }
