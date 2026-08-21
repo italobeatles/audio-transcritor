@@ -19,15 +19,15 @@ const outputDir = path.join(root, 'output');
 const tempDir = path.join(root, 'temp');
 
 const TRANSCRIPTION_MODELS = [
-  process.env.TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
   'gpt-4o-transcribe',
+  process.env.TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
   'whisper-1'
 ].filter(Boolean);
 
 const SUMMARY_MODELS = [
-  process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
-  'gpt-4o-mini',
-  'gpt-4o'
+  process.env.SUMMARY_MODEL || 'gpt-5-mini',
+  'gpt-5',
+  'gpt-5-nano'
 ].filter(Boolean);
 
 const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';

@@ -71,7 +71,9 @@ Variaveis principais:
 - `USE_OPENAI`: `true` ou `false` para habilitar chamadas OpenAI.
 - `TRANSCRIPTION_MODEL`: modelo OpenAI para transcricao, quando usado.
 - `SUMMARY_MODEL`: modelo OpenAI para texto, quando usado.
-- `GITHUB_TOKEN`: token para GitHub Models.
+- `FOUNDRY_API_KEY`: chave do Microsoft Foundry Models.
+- `FOUNDRY_ENDPOINT`: endpoint do projeto no Foundry.
+- `FOUNDRY_MODEL`: modelo deployado no Foundry.
 - `OPENROUTER_API_KEY`: chave do OpenRouter.
 - `GEMINI_API_KEY`: chave do Google Gemini.
 - `COHERE_API_KEY`: chave do Cohere.
@@ -83,25 +85,29 @@ A aplicacao tenta gerar respostas usando os providers configurados no `.env`. Se
 
 Providers usados:
 
-- OpenAI: `gpt-4.1-mini` para resposta e `gpt-4o-mini-transcribe` para transcricao remota opcional.
-- GitHub Models: `gpt-4o-mini`.
-- OpenRouter: `deepseek/deepseek-chat`.
-- Google Gemini: `gemini-flash-latest`.
-- Cohere: `command-r-plus-08-2024`.
-- Hugging Face Inference Providers: `deepseek-ai/DeepSeek-V4-Flash:fastest`.
+- OpenAI: `gpt-5-mini` para resposta e `gpt-4o-transcribe` para transcricao remota opcional.
+- Microsoft Foundry Models: substitui o antigo GitHub Models, que foi retirado em 2026.
+- OpenRouter: `openrouter/auto`.
+- Google Gemini: `gemini-2.5-flash`.
+- Cohere: `command-a-03-2025`.
+- Hugging Face Inference Providers: `zai-org/GLM-4.5`.
 - Transformers.js local: `Xenova/whisper-tiny` ou outro modelo configurado.
 
 ## Documentacao para obter chaves
 
 - OpenAI API keys: https://platform.openai.com/docs/api-reference/authentication
 - OpenAI Help Center sobre API keys: https://help.openai.com/en/articles/4936850-how-to-create-and-use-an-api-key
-- GitHub Models: https://docs.github.com/en/github-models/quickstart
-- GitHub Models BYOK: https://docs.github.com/en/github-models/github-models-at-scale/using-your-own-api-keys-in-github-models
+- GitHub Models foi retirado em 2026: https://docs.github.com/en/github-models?ref=apidog.com
+- Migracao de GitHub Models para Microsoft Foundry Models: https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/quickstart-github-models
+- Microsoft Foundry Models: https://learn.microsoft.com/en-us/azure/foundry/
 - OpenRouter API keys: https://openrouter.ai/docs/api-keys
 - Google Gemini API keys: https://ai.google.dev/gemini-api/docs/api-key
+- Google Gemini 2.5 Flash: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash
 - Cohere docs: https://docs.cohere.com/
-- Cohere API reference: https://docs.cohere.com/v2/reference/about
-- Hugging Face Inference Providers: https://huggingface.co/docs/api-inference
+- Cohere Command A: https://docs.cohere.com/docs/command-a
+- Hugging Face Inference Providers: https://huggingface.co/docs/inference-providers/tasks/chat-completion
+- OpenAI GPT-5: https://openai.com/index/introducing-gpt-5/
+- OpenAI audio models: https://openai.com/index/introducing-our-next-generation-audio-models/
 - NVIDIA NIM docs, usado na aplicacao 99freelas mas ainda nao integrado neste frontend: https://docs.api.nvidia.com/nim/docs/api-quickstart
 - BytePlus ModelArk, usado na aplicacao 99freelas mas ainda nao integrado neste frontend: https://docs.byteplus.com/en/docs/ModelArk/1399008
 

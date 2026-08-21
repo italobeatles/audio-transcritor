@@ -28,7 +28,15 @@ app.set('trust proxy', true);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(publicDir));
 
-const TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
+const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
+const OPENAI_SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gpt-5-mini';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/auto';
+const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY || process.env.GITHUB_TOKEN;
+const FOUNDRY_ENDPOINT = (process.env.FOUNDRY_ENDPOINT || process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com').replace(/\/+$/, '');
+const FOUNDRY_MODEL = process.env.FOUNDRY_MODEL || process.env.GITHUB_MODEL || 'gpt-5-mini';
+const HF_MODEL = process.env.HF_MODEL || 'zai-org/GLM-4.5';
+const COHERE_MODEL = process.env.COHERE_MODEL || 'command-a-03-2025';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 let localTranscriberPromise;
 let providerCache = [];
 let providerCacheAt = 0;
@@ -68,7 +76,7 @@ async function convertToWav(inputFile) {
 
 async function getLocalTranscriber() {
   if (!localTranscriberPromise) {
-    localTranscriberPromise = pipeline('automatic-speech-recognition', TRANSCRIPTION_MODEL);
+    localTranscriberPromise = pipeline('automatic-speech-recognition', LOCAL_TRANSCRIPTION_MODEL);
   }
   return localTranscriberPromise;
 }
@@ -145,7 +153,7 @@ Quero ser honesto e cuidadoso ao mesmo tempo. Eu valorizo essa troca e o que voc
 async function callOpenAi(prompt) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await client.chat.completions.create({
-    model: process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
+    model: OPENAI_SUMMARY_MODEL,
     temperature: 0.3,
     messages: [
       { role: 'system', content: 'Você é um assistente brasileiro.' },
@@ -191,14 +199,14 @@ function getProviderAttempts(prompt) {
     });
   }
 
-  if (process.env.GITHUB_TOKEN) {
+  if (FOUNDRY_API_KEY) {
     attempts.push({
-      name: 'GitHub Models',
+      name: 'Microsoft Foundry Models',
       fn: () => callProvider({
-        name: 'GitHub Models',
-        url: `${process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com'}/chat/completions`,
-        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.GITHUB_MODEL || 'gpt-4o-mini', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        name: 'Microsoft Foundry Models',
+        url: `${FOUNDRY_ENDPOINT}/chat/completions`,
+        headers: { Authorization: `Bearer ${FOUNDRY_API_KEY}`, 'Content-Type': 'application/json' },
+        body: { model: FOUNDRY_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -212,7 +220,7 @@ function getProviderAttempts(prompt) {
         name: 'OpenRouter',
         url: `${process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'}/chat/completions`,
         headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/italolopes/freelas-agent', 'X-Title': 'Transcritor WhatsApp' },
-        body: { model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: OPENROUTER_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -240,7 +248,7 @@ function getProviderAttempts(prompt) {
         name: 'Hugging Face',
         url: `${process.env.HF_BASE_URL || 'https://router.huggingface.co/v1'}/chat/completions`,
         headers: { Authorization: `Bearer ${process.env.HF_TOKEN}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.HF_MODEL || 'deepseek-ai/DeepSeek-V4-Flash:fastest', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: HF_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -254,7 +262,7 @@ function getProviderAttempts(prompt) {
         name: 'Cohere',
         url: `${process.env.COHERE_BASE_URL || 'https://api.cohere.com'}/v2/chat`,
         headers: { Authorization: `Bearer ${process.env.COHERE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.COHERE_MODEL || 'command-r-plus-08-2024', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: COHERE_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.message?.content?.[0]?.text?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -322,7 +330,7 @@ function getProviderAttempts(prompt) {
       name: 'Gemini',
       fn: () => callProvider({
         name: 'Gemini',
-        url: `${process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'}/models/${process.env.GEMINI_MODEL || 'gemini-flash-latest'}:generateContent`,
+        url: `${process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'}/models/${GEMINI_MODEL}:generateContent`,
         headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
         body: { contents: [{ role: 'user', parts: [{ text: prompt }] }] },
         extractor: json => json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '',
@@ -405,14 +413,14 @@ function providerEnvSnapshot() {
       enabled: Boolean(process.env.GROQ_API_KEY)
     },
     {
-      providerName: 'GitHub Models',
-      modelName: process.env.GITHUB_MODEL || 'gpt-4o-mini',
-      keyPresent: Boolean(process.env.GITHUB_TOKEN),
-      enabled: Boolean(process.env.GITHUB_TOKEN)
+      providerName: 'Microsoft Foundry Models',
+      modelName: FOUNDRY_MODEL,
+      keyPresent: Boolean(FOUNDRY_API_KEY),
+      enabled: Boolean(FOUNDRY_API_KEY)
     },
     {
       providerName: 'OpenRouter',
-      modelName: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
+      modelName: OPENROUTER_MODEL,
       keyPresent: Boolean(process.env.OPENROUTER_API_KEY),
       enabled: Boolean(process.env.OPENROUTER_API_KEY)
     },
@@ -424,13 +432,13 @@ function providerEnvSnapshot() {
     },
     {
       providerName: 'Hugging Face',
-      modelName: process.env.HF_MODEL || 'deepseek-ai/DeepSeek-V4-Flash:fastest',
+      modelName: HF_MODEL,
       keyPresent: Boolean(process.env.HF_TOKEN),
       enabled: Boolean(process.env.HF_TOKEN)
     },
     {
       providerName: 'Cohere',
-      modelName: process.env.COHERE_MODEL || 'command-r-plus-08-2024',
+      modelName: COHERE_MODEL,
       keyPresent: Boolean(process.env.COHERE_API_KEY),
       enabled: Boolean(process.env.COHERE_API_KEY)
     },
@@ -460,13 +468,13 @@ function providerEnvSnapshot() {
     },
     {
       providerName: 'OpenAI',
-      modelName: process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
+      modelName: OPENAI_SUMMARY_MODEL,
       keyPresent: Boolean(process.env.OPENAI_API_KEY),
       enabled: process.env.USE_OPENAI !== 'false'
     },
     {
       providerName: 'Google Gemini',
-      modelName: process.env.GEMINI_MODEL || 'gemini-flash-latest',
+      modelName: GEMINI_MODEL,
       keyPresent: Boolean(process.env.GEMINI_API_KEY),
       enabled: Boolean(process.env.GEMINI_API_KEY)
     },
@@ -506,11 +514,11 @@ async function probeProvider(provider) {
       return { ...provider, status, lastError: '' };
     }
 
-    if (providerName === 'GitHub Models' && process.env.GITHUB_TOKEN) {
+    if (providerName === 'Microsoft Foundry Models' && FOUNDRY_API_KEY) {
       const status = await testCall({
-        name: 'GitHub Models',
-        url: `${process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com'}/chat/completions`,
-        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+        name: 'Microsoft Foundry Models',
+        url: `${FOUNDRY_ENDPOINT}/chat/completions`,
+        headers: { Authorization: `Bearer ${FOUNDRY_API_KEY}`, 'Content-Type': 'application/json' },
         body: { model: modelName, temperature: 0, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta'
