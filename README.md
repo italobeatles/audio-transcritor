@@ -71,6 +71,7 @@ Variaveis principais:
 - `USE_OPENAI`: `true` ou `false` para habilitar chamadas OpenAI.
 - `TRANSCRIPTION_MODEL`: modelo OpenAI para transcricao, quando usado.
 - `PREFER_REMOTE_TRANSCRIPTION`: usa a transcricao OpenAI antes do fallback local quando definido como `true`.
+- `ALLOW_LOCAL_TRANSCRIPTION_FALLBACK`: permite voltar ao Whisper local quando a API remota falha; mantenha `false` em producao para evitar o erro de stream do runtime ONNX.
 - `SUMMARY_MODEL`: modelo OpenAI para texto, quando usado.
 - `FOUNDRY_API_KEY`: chave do Microsoft Foundry Models.
 - `FOUNDRY_ENDPOINT`: endpoint do projeto no Foundry.

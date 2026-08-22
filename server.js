@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs-extra';
-import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ffmpegPath from 'ffmpeg-static';
@@ -31,6 +30,7 @@ app.use(express.static(publicDir));
 
 const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
 const OPENAI_TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
+const OPENAI_API_BASE_URL = (process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
 const OPENAI_SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gpt-5-mini';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/auto';
 const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY || process.env.GITHUB_TOKEN;
@@ -85,15 +85,26 @@ async function getLocalTranscriber() {
 
 async function transcribeWithOpenAi(inputPath, onProgress) {
   onProgress?.({ percent: 15, step: 'Enviando audio para a transcricao remota...' });
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const result = await client.audio.transcriptions.create({
-    file: createReadStream(inputPath),
-    model: OPENAI_TRANSCRIPTION_MODEL,
-    language: 'pt',
-    temperature: 0
+  const audioBuffer = await fs.readFile(inputPath);
+  const form = new FormData();
+  form.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), path.basename(inputPath));
+  form.append('model', OPENAI_TRANSCRIPTION_MODEL);
+  form.append('language', 'pt');
+  form.append('temperature', '0');
+
+  const response = await fetch(`${OPENAI_API_BASE_URL}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(180000)
   });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`OpenAI ${response.status}: ${payload.error?.message || 'falha na transcricao'}`);
+  }
+
   onProgress?.({ percent: 90, step: 'Finalizando transcricao remota...' });
-  return normalizeText(result?.text);
+  return normalizeText(payload.text);
 }
 
 async function transcribeAudio(inputPath, onProgress) {
@@ -102,6 +113,7 @@ async function transcribeAudio(inputPath, onProgress) {
       return await transcribeWithOpenAi(inputPath, onProgress);
     } catch (error) {
       console.error(`Transcricao remota falhou (${OPENAI_TRANSCRIPTION_MODEL}); usando fallback local: ${error.message}`);
+      if (process.env.ALLOW_LOCAL_TRANSCRIPTION_FALLBACK !== 'true') throw error;
       onProgress?.({ percent: 8, step: 'Transcricao remota indisponivel; usando processamento local...' });
     }
   }
