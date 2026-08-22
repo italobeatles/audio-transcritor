@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs-extra';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ffmpegPath from 'ffmpeg-static';
@@ -29,6 +30,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.static(publicDir));
 
 const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
+const OPENAI_TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
 const OPENAI_SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gpt-5-mini';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/auto';
 const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY || process.env.GITHUB_TOKEN;
@@ -81,7 +83,30 @@ async function getLocalTranscriber() {
   return localTranscriberPromise;
 }
 
+async function transcribeWithOpenAi(inputPath, onProgress) {
+  onProgress?.({ percent: 15, step: 'Enviando audio para a transcricao remota...' });
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const result = await client.audio.transcriptions.create({
+    file: createReadStream(inputPath),
+    model: OPENAI_TRANSCRIPTION_MODEL,
+    language: 'pt',
+    temperature: 0
+  });
+  onProgress?.({ percent: 90, step: 'Finalizando transcricao remota...' });
+  return normalizeText(result?.text);
+}
+
 async function transcribeAudio(inputPath, onProgress) {
+  if (hasOpenAi() && process.env.PREFER_REMOTE_TRANSCRIPTION !== 'false') {
+    try {
+      return await transcribeWithOpenAi(inputPath, onProgress);
+    } catch (error) {
+      console.error(`Transcricao remota falhou (${OPENAI_TRANSCRIPTION_MODEL}); usando fallback local: ${error.message}`);
+      onProgress?.({ percent: 8, step: 'Transcricao remota indisponivel; usando processamento local...' });
+    }
+  }
+
+  onProgress?.({ percent: 15, step: 'Convertendo Ã¡udio para WAV...' });
   onProgress?.({ percent: 15, step: 'Convertendo áudio para WAV...' });
   const wavPath = await convertToWav(inputPath);
 

@@ -70,6 +70,7 @@ Variaveis principais:
 - `OPENAI_API_KEY`: chave da OpenAI.
 - `USE_OPENAI`: `true` ou `false` para habilitar chamadas OpenAI.
 - `TRANSCRIPTION_MODEL`: modelo OpenAI para transcricao, quando usado.
+- `PREFER_REMOTE_TRANSCRIPTION`: usa a transcricao OpenAI antes do fallback local quando definido como `true`.
 - `SUMMARY_MODEL`: modelo OpenAI para texto, quando usado.
 - `FOUNDRY_API_KEY`: chave do Microsoft Foundry Models.
 - `FOUNDRY_ENDPOINT`: endpoint do projeto no Foundry.
