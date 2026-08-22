@@ -71,6 +71,7 @@ Variaveis principais:
 - `USE_OPENAI`: `true` ou `false` para habilitar chamadas OpenAI.
 - `TRANSCRIPTION_MODEL`: modelo OpenAI para transcricao, quando usado.
 - `PREFER_REMOTE_TRANSCRIPTION`: usa a transcricao OpenAI antes do fallback local quando definido como `true`.
+- `TRANSCRIPTION_PROVIDERS`: ordem dos providers de audio, separados por virgula; padrao `openai,groq`.
 - `ALLOW_LOCAL_TRANSCRIPTION_FALLBACK`: permite voltar ao Whisper local quando a API remota falha; mantenha `false` em producao para evitar o erro de stream do runtime ONNX.
 - `SUMMARY_MODEL`: modelo OpenAI para texto, quando usado.
 - `FOUNDRY_API_KEY`: chave do Microsoft Foundry Models.
@@ -87,7 +88,8 @@ A aplicacao tenta gerar respostas usando os providers configurados no `.env`. Se
 
 Providers usados:
 
-- OpenAI: `gpt-5-mini` para resposta e `gpt-4o-transcribe` para transcricao remota opcional.
+- OpenAI: `gpt-5-mini` para resposta e `gpt-4o-transcribe` para transcricao remota.
+- Groq: `whisper-large-v3-turbo` como segundo provider de transcricao, quando `GROQ_API_KEY` estiver configurada.
 - Microsoft Foundry Models: substitui o antigo GitHub Models, que foi retirado em 2026.
 - OpenRouter: `openrouter/auto`.
 - Google Gemini: `gemini-2.5-flash`.

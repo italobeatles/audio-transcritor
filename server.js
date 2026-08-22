@@ -31,6 +31,11 @@ app.use(express.static(publicDir));
 const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
 const OPENAI_TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
 const OPENAI_API_BASE_URL = (process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+const GROQ_TRANSCRIPTION_MODEL = process.env.GROQ_TRANSCRIPTION_MODEL || 'whisper-large-v3-turbo';
+const TRANSCRIPTION_PROVIDERS = (process.env.TRANSCRIPTION_PROVIDERS || 'openai,groq')
+  .split(',')
+  .map(provider => provider.trim().toLowerCase())
+  .filter(Boolean);
 const OPENAI_SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gpt-5-mini';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/auto';
 const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY || process.env.GITHUB_TOKEN;
@@ -107,15 +112,60 @@ async function transcribeWithOpenAi(inputPath, onProgress) {
   return normalizeText(payload.text);
 }
 
+async function transcribeWithGroq(inputPath, onProgress) {
+  onProgress?.({ percent: 15, step: 'Enviando audio para o Groq...' });
+  const audioBuffer = await fs.readFile(inputPath);
+  const form = new FormData();
+  form.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), path.basename(inputPath));
+  form.append('model', GROQ_TRANSCRIPTION_MODEL);
+  form.append('language', 'pt');
+  form.append('temperature', '0');
+
+  const response = await fetch(`${process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1'}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(180000)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Groq ${response.status}: ${payload.error?.message || 'falha na transcricao'}`);
+  }
+
+  onProgress?.({ percent: 90, step: 'Finalizando transcricao pelo Groq...' });
+  return normalizeText(payload.text);
+}
+
 async function transcribeAudio(inputPath, onProgress) {
-  if (hasOpenAi() && process.env.PREFER_REMOTE_TRANSCRIPTION !== 'false') {
-    try {
-      return await transcribeWithOpenAi(inputPath, onProgress);
-    } catch (error) {
-      console.error(`Transcricao remota falhou (${OPENAI_TRANSCRIPTION_MODEL}); usando fallback local: ${error.message}`);
-      if (process.env.ALLOW_LOCAL_TRANSCRIPTION_FALLBACK !== 'true') throw error;
-      onProgress?.({ percent: 8, step: 'Transcricao remota indisponivel; usando processamento local...' });
+  const providerErrors = [];
+  if (process.env.PREFER_REMOTE_TRANSCRIPTION !== 'false') {
+    for (const provider of TRANSCRIPTION_PROVIDERS) {
+      const configured = provider === 'openai'
+        ? hasOpenAi()
+        : provider === 'groq' && Boolean(process.env.GROQ_API_KEY);
+      if (!configured) continue;
+
+      try {
+        const text = provider === 'openai'
+          ? await transcribeWithOpenAi(inputPath, onProgress)
+          : await transcribeWithGroq(inputPath, onProgress);
+        if (text) return text;
+        throw new Error('provider retornou transcricao vazia');
+      } catch (error) {
+        providerErrors.push(`${provider}: ${error.message}`);
+        console.error(`Transcricao falhou no provider ${provider}: ${error.message}`);
+      }
     }
+  }
+
+  if (process.env.ALLOW_LOCAL_TRANSCRIPTION_FALLBACK !== 'true') {
+    throw new Error(providerErrors.length
+      ? `Nenhum provider de transcricao respondeu. ${providerErrors.join(' | ')}`
+      : 'Nenhum provider de transcricao configurado.');
+  }
+
+  if (providerErrors.length) {
+    onProgress?.({ percent: 8, step: 'Providers remotos indisponiveis; usando processamento local...' });
   }
 
   onProgress?.({ percent: 15, step: 'Convertendo Ã¡udio para WAV...' });
