@@ -19,19 +19,19 @@ const outputDir = path.join(root, 'output');
 const tempDir = path.join(root, 'temp');
 
 const TRANSCRIPTION_MODELS = [
-  process.env.TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
   'gpt-4o-transcribe',
+  process.env.TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
   'whisper-1'
 ].filter(Boolean);
 
 const SUMMARY_MODELS = [
-  process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
-  'gpt-4o-mini',
-  'gpt-4o'
+  process.env.SUMMARY_MODEL || 'gpt-5-mini',
+  'gpt-5',
+  'gpt-5-nano'
 ].filter(Boolean);
 
 const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
-const SUPPORTED = /\.(opus|ogg|mp3|m4a|wav|webm|mp4|mpeg|mpga)$/i;
+const SUPPORTED = /\.(aac|aiff|amr|flac|m4a|m4b|mka|mp3|mp4|oga|ogg|opus|wav|webm|wma|3gp|mpeg|mpga)$/i;
 const STOPWORDS = new Set([
   'a', 'à', 'agora', 'ainda', 'algo', 'alguma', 'algumas', 'algum', 'alguns', 'ao', 'aos',
   'as', 'até', 'com', 'como', 'da', 'das', 'de', 'dela', 'dele', 'deles', 'demais', 'depois',

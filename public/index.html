@@ -55,10 +55,10 @@
               <h2>Áudio</h2>
               <small class="field-help">Envie o arquivo que será transcrito antes da criação da resposta.</small>
             </div>
-            <span class="panel-chip">opus / mp3 / wav</span>
+            <span class="panel-chip">m4a / mp3 / wav / ogg / flac</span>
           </div>
           <div id="dropZone" class="drop-zone">
-            <input id="audioInput" type="file" accept="audio/*" hidden>
+            <input id="audioInput" type="file" accept=".m4a,.mp3,.wav,.ogg,.oga,.opus,.flac,.aac,.aiff,.amr,.mka,.mp4,.webm,.wma,.3gp,.mpeg,.mpga,audio/*" hidden>
             <div class="drop-icon">↑</div>
             <div class="drop-title">Solte o arquivo aqui</div>
             <div class="drop-text">ou clique para selecionar do computador</div>
@@ -67,7 +67,7 @@
           <div class="file-row">
             <div>
               <div class="field-label">Arquivo selecionado</div>
-              <small class="field-help">Nome do áudio que será enviado para transcrição.</small>
+              <small class="field-help">Formatos aceitos: m4a, mp3, wav, ogg, opus, flac, aac, webm, mp4 e outros formatos compatíveis com FFmpeg.</small>
               <div id="fileName" class="file-name">Nenhum arquivo selecionado</div>
             </div>
             <button type="button" class="button primary" id="transcribeBtn">Transcrever</button>

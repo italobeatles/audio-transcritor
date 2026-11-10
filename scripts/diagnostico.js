@@ -37,9 +37,9 @@ for (const dir of [audioDir, outputDir, tempDir]) {
   ok(`Pasta disponível: ${path.relative(root, dir)}`);
 }
 
-const audios = fs.readdirSync(audioDir).filter(file => /\.(opus|ogg|mp3|m4a|wav|webm|mp4|mpeg|mpga)$/i.test(file));
+const audios = fs.readdirSync(audioDir).filter(file => /\.(aac|aiff|amr|flac|m4a|m4b|mka|mp3|mp4|oga|ogg|opus|wav|webm|wma|3gp|mpeg|mpga)$/i.test(file));
 if (audios.length) ok(`${audios.length} arquivo(s) de áudio encontrado(s) em /audio`);
-else warn('Nenhum áudio encontrado em /audio. Copie arquivos .opus, .mp3, .m4a, .wav ou .webm para essa pasta.');
+else warn('Nenhum áudio encontrado em /audio. Copie arquivos .m4a, .mp3, .wav, .ogg, .opus, .flac ou .webm para essa pasta.');
 
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim().length > 10) {
   ok('OPENAI_API_KEY configurada. O app tentará OpenAI antes do fallback local.');

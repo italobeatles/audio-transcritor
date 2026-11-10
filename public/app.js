@@ -20,12 +20,23 @@ const respondProgressBar = document.getElementById('respondProgressBar');
 const respondProgressText = document.getElementById('respondProgressText');
 
 let selectedFile = null;
+const supportedAudioExtensions = new Set(['m4a', 'mp3', 'wav', 'ogg', 'oga', 'opus', 'flac', 'aac', 'aiff', 'amr', 'mka', 'mp4', 'webm', 'wma', '3gp', 'mpeg', 'mpga']);
 
 function setStatus(text) {
   statusPill.textContent = text;
 }
 
 function setFile(file) {
+  if (file) {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!supportedAudioExtensions.has(extension) && !file.type.startsWith('audio/')) {
+      selectedFile = null;
+      audioInput.value = '';
+      fileName.textContent = 'Formato não suportado';
+      setStatus('Formato de áudio não suportado');
+      return;
+    }
+  }
   selectedFile = file;
   fileName.textContent = file ? file.name : 'Nenhum arquivo selecionado';
 }

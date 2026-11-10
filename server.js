@@ -24,11 +24,37 @@ transformersEnv.useFSCache = true;
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+const SUPPORTED_AUDIO_EXTENSIONS = new Set([
+  '.aac', '.aiff', '.amr', '.flac', '.m4a', '.m4b', '.mka', '.mp3', '.mp4',
+  '.oga', '.ogg', '.opus', '.wav', '.webm', '.wma', '.3gp', '.mpeg', '.mpga'
+]);
+const AUDIO_MIME_TYPES = {
+  '.aac': 'audio/aac', '.aiff': 'audio/aiff', '.amr': 'audio/amr', '.flac': 'audio/flac',
+  '.m4a': 'audio/mp4', '.m4b': 'audio/mp4', '.mka': 'audio/x-matroska', '.mp3': 'audio/mpeg',
+  '.mp4': 'audio/mp4', '.oga': 'audio/ogg', '.ogg': 'audio/ogg', '.opus': 'audio/ogg',
+  '.wav': 'audio/wav', '.webm': 'audio/webm', '.wma': 'audio/x-ms-wma', '.3gp': 'audio/3gpp',
+  '.mpeg': 'audio/mpeg', '.mpga': 'audio/mpeg'
+};
 app.set('trust proxy', true);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(publicDir));
 
-const TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
+const LOCAL_TRANSCRIPTION_MODEL = process.env.LOCAL_TRANSCRIPTION_MODEL || 'Xenova/whisper-base';
+const OPENAI_TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
+const OPENAI_API_BASE_URL = (process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+const GROQ_TRANSCRIPTION_MODEL = process.env.GROQ_TRANSCRIPTION_MODEL || 'whisper-large-v3-turbo';
+const TRANSCRIPTION_PROVIDERS = (process.env.TRANSCRIPTION_PROVIDERS || 'openai,groq')
+  .split(',')
+  .map(provider => provider.trim().toLowerCase())
+  .filter(Boolean);
+const OPENAI_SUMMARY_MODEL = process.env.SUMMARY_MODEL || 'gpt-5-mini';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/auto';
+const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY || process.env.GITHUB_TOKEN;
+const FOUNDRY_ENDPOINT = (process.env.FOUNDRY_ENDPOINT || process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com').replace(/\/+$/, '');
+const FOUNDRY_MODEL = process.env.FOUNDRY_MODEL || process.env.GITHUB_MODEL || 'gpt-5-mini';
+const HF_MODEL = process.env.HF_MODEL || 'zai-org/GLM-4.5';
+const COHERE_MODEL = process.env.COHERE_MODEL || 'command-a-03-2025';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 let localTranscriberPromise;
 let providerCache = [];
 let providerCacheAt = 0;
@@ -39,6 +65,10 @@ function hasOpenAi() {
 
 function normalizeText(text) {
   return String(text || '').replace(/\s+/g, ' ').replace(/\s+([,.!?;:])/g, '$1').trim();
+}
+
+function audioMimeType(inputPath) {
+  return AUDIO_MIME_TYPES[path.extname(inputPath).toLowerCase()] || 'application/octet-stream';
 }
 
 async function ensureDir(dir) {
@@ -68,12 +98,92 @@ async function convertToWav(inputFile) {
 
 async function getLocalTranscriber() {
   if (!localTranscriberPromise) {
-    localTranscriberPromise = pipeline('automatic-speech-recognition', TRANSCRIPTION_MODEL);
+    localTranscriberPromise = pipeline('automatic-speech-recognition', LOCAL_TRANSCRIPTION_MODEL);
   }
   return localTranscriberPromise;
 }
 
+async function transcribeWithOpenAi(inputPath, onProgress) {
+  onProgress?.({ percent: 15, step: 'Enviando audio para a transcricao remota...' });
+  const audioBuffer = await fs.readFile(inputPath);
+  const form = new FormData();
+  form.append('file', new Blob([audioBuffer], { type: audioMimeType(inputPath) }), path.basename(inputPath));
+  form.append('model', OPENAI_TRANSCRIPTION_MODEL);
+  form.append('language', 'pt');
+  form.append('temperature', '0');
+
+  const response = await fetch(`${OPENAI_API_BASE_URL}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(180000)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`OpenAI ${response.status}: ${payload.error?.message || 'falha na transcricao'}`);
+  }
+
+  onProgress?.({ percent: 90, step: 'Finalizando transcricao remota...' });
+  return normalizeText(payload.text);
+}
+
+async function transcribeWithGroq(inputPath, onProgress) {
+  onProgress?.({ percent: 15, step: 'Enviando audio para o Groq...' });
+  const audioBuffer = await fs.readFile(inputPath);
+  const form = new FormData();
+  form.append('file', new Blob([audioBuffer], { type: audioMimeType(inputPath) }), path.basename(inputPath));
+  form.append('model', GROQ_TRANSCRIPTION_MODEL);
+  form.append('language', 'pt');
+  form.append('temperature', '0');
+
+  const response = await fetch(`${process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1'}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(180000)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Groq ${response.status}: ${payload.error?.message || 'falha na transcricao'}`);
+  }
+
+  onProgress?.({ percent: 90, step: 'Finalizando transcricao pelo Groq...' });
+  return normalizeText(payload.text);
+}
+
 async function transcribeAudio(inputPath, onProgress) {
+  const providerErrors = [];
+  if (process.env.PREFER_REMOTE_TRANSCRIPTION !== 'false') {
+    for (const provider of TRANSCRIPTION_PROVIDERS) {
+      const configured = provider === 'openai'
+        ? hasOpenAi()
+        : provider === 'groq' && Boolean(process.env.GROQ_API_KEY);
+      if (!configured) continue;
+
+      try {
+        const text = provider === 'openai'
+          ? await transcribeWithOpenAi(inputPath, onProgress)
+          : await transcribeWithGroq(inputPath, onProgress);
+        if (text) return text;
+        throw new Error('provider retornou transcricao vazia');
+      } catch (error) {
+        providerErrors.push(`${provider}: ${error.message}`);
+        console.error(`Transcricao falhou no provider ${provider}: ${error.message}`);
+      }
+    }
+  }
+
+  if (process.env.ALLOW_LOCAL_TRANSCRIPTION_FALLBACK !== 'true') {
+    throw new Error(providerErrors.length
+      ? `Nenhum provider de transcricao respondeu. ${providerErrors.join(' | ')}`
+      : 'Nenhum provider de transcricao configurado.');
+  }
+
+  if (providerErrors.length) {
+    onProgress?.({ percent: 8, step: 'Providers remotos indisponiveis; usando processamento local...' });
+  }
+
+  onProgress?.({ percent: 15, step: 'Convertendo Ã¡udio para WAV...' });
   onProgress?.({ percent: 15, step: 'Convertendo áudio para WAV...' });
   const wavPath = await convertToWav(inputPath);
 
@@ -145,7 +255,7 @@ Quero ser honesto e cuidadoso ao mesmo tempo. Eu valorizo essa troca e o que voc
 async function callOpenAi(prompt) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await client.chat.completions.create({
-    model: process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
+    model: OPENAI_SUMMARY_MODEL,
     temperature: 0.3,
     messages: [
       { role: 'system', content: 'Você é um assistente brasileiro.' },
@@ -191,14 +301,14 @@ function getProviderAttempts(prompt) {
     });
   }
 
-  if (process.env.GITHUB_TOKEN) {
+  if (FOUNDRY_API_KEY) {
     attempts.push({
-      name: 'GitHub Models',
+      name: 'Microsoft Foundry Models',
       fn: () => callProvider({
-        name: 'GitHub Models',
-        url: `${process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com'}/chat/completions`,
-        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.GITHUB_MODEL || 'gpt-4o-mini', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        name: 'Microsoft Foundry Models',
+        url: `${FOUNDRY_ENDPOINT}/chat/completions`,
+        headers: { Authorization: `Bearer ${FOUNDRY_API_KEY}`, 'Content-Type': 'application/json' },
+        body: { model: FOUNDRY_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -212,7 +322,7 @@ function getProviderAttempts(prompt) {
         name: 'OpenRouter',
         url: `${process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'}/chat/completions`,
         headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/italolopes/freelas-agent', 'X-Title': 'Transcritor WhatsApp' },
-        body: { model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: OPENROUTER_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -240,7 +350,7 @@ function getProviderAttempts(prompt) {
         name: 'Hugging Face',
         url: `${process.env.HF_BASE_URL || 'https://router.huggingface.co/v1'}/chat/completions`,
         headers: { Authorization: `Bearer ${process.env.HF_TOKEN}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.HF_MODEL || 'deepseek-ai/DeepSeek-V4-Flash:fastest', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: HF_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -254,7 +364,7 @@ function getProviderAttempts(prompt) {
         name: 'Cohere',
         url: `${process.env.COHERE_BASE_URL || 'https://api.cohere.com'}/v2/chat`,
         headers: { Authorization: `Bearer ${process.env.COHERE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: { model: process.env.COHERE_MODEL || 'command-r-plus-08-2024', temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
+        body: { model: COHERE_MODEL, temperature: 0.3, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.message?.content?.[0]?.text?.trim() || '',
         errorHint: 'sem resposta util'
       })
@@ -322,7 +432,7 @@ function getProviderAttempts(prompt) {
       name: 'Gemini',
       fn: () => callProvider({
         name: 'Gemini',
-        url: `${process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'}/models/${process.env.GEMINI_MODEL || 'gemini-flash-latest'}:generateContent`,
+        url: `${process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'}/models/${GEMINI_MODEL}:generateContent`,
         headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
         body: { contents: [{ role: 'user', parts: [{ text: prompt }] }] },
         extractor: json => json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '',
@@ -405,14 +515,14 @@ function providerEnvSnapshot() {
       enabled: Boolean(process.env.GROQ_API_KEY)
     },
     {
-      providerName: 'GitHub Models',
-      modelName: process.env.GITHUB_MODEL || 'gpt-4o-mini',
-      keyPresent: Boolean(process.env.GITHUB_TOKEN),
-      enabled: Boolean(process.env.GITHUB_TOKEN)
+      providerName: 'Microsoft Foundry Models',
+      modelName: FOUNDRY_MODEL,
+      keyPresent: Boolean(FOUNDRY_API_KEY),
+      enabled: Boolean(FOUNDRY_API_KEY)
     },
     {
       providerName: 'OpenRouter',
-      modelName: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
+      modelName: OPENROUTER_MODEL,
       keyPresent: Boolean(process.env.OPENROUTER_API_KEY),
       enabled: Boolean(process.env.OPENROUTER_API_KEY)
     },
@@ -424,13 +534,13 @@ function providerEnvSnapshot() {
     },
     {
       providerName: 'Hugging Face',
-      modelName: process.env.HF_MODEL || 'deepseek-ai/DeepSeek-V4-Flash:fastest',
+      modelName: HF_MODEL,
       keyPresent: Boolean(process.env.HF_TOKEN),
       enabled: Boolean(process.env.HF_TOKEN)
     },
     {
       providerName: 'Cohere',
-      modelName: process.env.COHERE_MODEL || 'command-r-plus-08-2024',
+      modelName: COHERE_MODEL,
       keyPresent: Boolean(process.env.COHERE_API_KEY),
       enabled: Boolean(process.env.COHERE_API_KEY)
     },
@@ -460,13 +570,13 @@ function providerEnvSnapshot() {
     },
     {
       providerName: 'OpenAI',
-      modelName: process.env.SUMMARY_MODEL || 'gpt-4.1-mini',
+      modelName: OPENAI_SUMMARY_MODEL,
       keyPresent: Boolean(process.env.OPENAI_API_KEY),
       enabled: process.env.USE_OPENAI !== 'false'
     },
     {
       providerName: 'Google Gemini',
-      modelName: process.env.GEMINI_MODEL || 'gemini-flash-latest',
+      modelName: GEMINI_MODEL,
       keyPresent: Boolean(process.env.GEMINI_API_KEY),
       enabled: Boolean(process.env.GEMINI_API_KEY)
     },
@@ -506,11 +616,11 @@ async function probeProvider(provider) {
       return { ...provider, status, lastError: '' };
     }
 
-    if (providerName === 'GitHub Models' && process.env.GITHUB_TOKEN) {
+    if (providerName === 'Microsoft Foundry Models' && FOUNDRY_API_KEY) {
       const status = await testCall({
-        name: 'GitHub Models',
-        url: `${process.env.GITHUB_BASE_URL || 'https://models.inference.ai.azure.com'}/chat/completions`,
-        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+        name: 'Microsoft Foundry Models',
+        url: `${FOUNDRY_ENDPOINT}/chat/completions`,
+        headers: { Authorization: `Bearer ${FOUNDRY_API_KEY}`, 'Content-Type': 'application/json' },
         body: { model: modelName, temperature: 0, messages: [{ role: 'user', content: prompt }] },
         extractor: json => json.choices?.[0]?.message?.content?.trim() || '',
         errorHint: 'sem resposta'
@@ -671,7 +781,14 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
       return;
     }
 
-    const ext = path.extname(req.file.originalname) || '.ogg';
+    const uploadedExtension = path.extname(req.file.originalname).toLowerCase();
+    if (!SUPPORTED_AUDIO_EXTENSIONS.has(uploadedExtension)) {
+      sseSend(res, 'error', { error: 'Formato não suportado. Envie um arquivo de áudio como m4a, mp3, wav, ogg, opus, flac, aac, webm ou mp4.' });
+      res.end();
+      return;
+    }
+
+    const ext = uploadedExtension || '.ogg';
     tempFile = path.join(tempDir, `upload_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
     await ensureDir(tempDir);
     await fs.writeFile(tempFile, req.file.buffer);
